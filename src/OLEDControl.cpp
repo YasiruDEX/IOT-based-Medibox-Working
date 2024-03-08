@@ -33,6 +33,13 @@ void OLEDControl::printLine(String message, int textSize, int row, int column) {
   display.println(message);
 }
 
+void OLEDControl::printLineBlack(String message, int textSize, int row, int column) {
+  display.setTextSize(textSize);
+  display.setTextColor(SSD1306_BLACK);
+  display.setCursor(column, row);
+  display.println(message);
+}
+
 void OLEDControl::clearDisplay() {
   display.clearDisplay();
 }

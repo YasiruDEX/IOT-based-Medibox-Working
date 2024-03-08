@@ -10,10 +10,10 @@ void WiFiServerControl::setup() {
   Serial.println("Wokwi-GUEST");
   WiFi.begin("Wokwi-GUEST", "");
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
+  // while (WiFi.status() != WL_CONNECTED) {
+  //   delay(500);
+  //   Serial.print(".");
+  // }
 
   Serial.println("WiFi Connected");
   Serial.println("IP address: ");

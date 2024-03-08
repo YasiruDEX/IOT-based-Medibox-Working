@@ -1,14 +1,17 @@
+/////////////////////////////////////// Libraries Import ///////////////////////////////////////
+
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <WiFi.h>
 #include <DHTesp.h>
-#include <PubSubClient.h>
 
 #include "TemperatureControl.h"
 #include "BuzzerControl.h"
 #include "OLEDControl.h"
 #include "WiFiServer.h"
+
+///////////////////////////////////////// Pin Definitions ////////////////////////////////////////
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -26,6 +29,8 @@
 #define DOWN 35
 #define DHT_PIN 12
 
+///////////////////////////////////////// Note Definitions //////////////////////////////////////
+
 int num_notes = 8;
 int note_A = 220;
 int note_B = 294;
@@ -38,6 +43,8 @@ int note_C_H = 523;
 int notes[] = {note_A, note_B, note_C, note_D, note_F, note_E, note_G, note_C_H};
 
 char tempAr[6];
+
+////////////////////////////////////// Date and Time Variables ///////////////////////////////////
 
 int days = 0;
 int month = 0;
@@ -60,12 +67,17 @@ int current_mode = 0;
 int max_modes = 5;
 String options[] = {"1 - Set Time", "2 - Set Alarm 1", "3 - Set Alarm 2", "4 - Set Alarm 3", "5 - Remove Alarm"};
 int utc_offset = 19800;
+int prev_minutes = 0;
 
-Adafruit_SSD1306  display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+/////////////////////////////////////// Object Instantiations ////////////////////////////////////
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 OLEDControl oledControl(display);
 TemperatureControl temperatureControl(DHT_PIN, oledControl);
 BuzzerControl buzzerControl(BUZZER);
 WiFiServerControl wifiServerControl("Wokwi-GUEST", "");
+
+/////////////////////////////////////////// Setup Function ////////////////////////////////////////
 
 void setup() {
   Serial.begin(115200);
@@ -85,11 +97,14 @@ void setup() {
   oledControl.setup();
 
   oledControl.clearDisplay();
-  printLine("Welcome to medibox!", 0, 0, 2);
+  printLine("IoT-based-Medibox", 0, 0, 10);
+  printLine("WELCOME", 3, 20, 2);
   delay(3000);
 
   configTime(UTC_OFFSET, UTC_OFFSET_DST, NTP_SERVER);
 }
+
+/////////////////////////////////////////// Loop Function /////////////////////////////////////////
 
 void loop() {
   update_time_with_check_alarm();
@@ -102,20 +117,40 @@ void loop() {
   temperatureControl.checkTemperature();
 }
 
-void print_time_now() {
-  oledControl.clearDisplay();
-   printLine(String(days), 1, 0, 0);
-   printLine("/", 1, 0, 10);
-   printLine(String(month), 1, 0, 20);
-   printLine("/", 1, 0, 30);
-   printLine(String(year), 1, 0, 40);
+////////////////////////////////////// Display Time on OLED /////////////////////////////////////
 
-   printLine(String(hours), 2, 10, 0);
-   printLine(":", 2, 10, 20);
-   printLine(String(minutes), 2, 10, 30);
-   printLine(":", 2, 10, 50);
-   printLine(String(seconds), 2, 10, 60);
+void print_time_now() {
+  if (prev_minutes != minutes){
+    oledControl.clearDisplay();
+
+    String date = String(days) + "/" + String(month) + "/" + String(year);
+    printLine(date, 1, 0, 30);
+
+    int twelve_hour = hours % 24;
+
+    // Format hours and minutes as two digits
+    String formatted_hours = (twelve_hour < 10) ? "0" + String(twelve_hour) : String(twelve_hour);
+    String formatted_minutes = (minutes < 10) ? "0" + String(minutes) : String(minutes);
+
+    String time_to_print = formatted_hours + ":" + formatted_minutes;
+
+    if (twelve_hour >= 12) {
+      time_to_print += "PM";
+    } else {
+      time_to_print += "AM";
+    }
+
+    printLine(String(time_to_print), 3, 25, 0);
+
+    display.drawRect(44, 50, 40, 10, SSD1306_WHITE);
+
+    printLineBlack("MENU", 1, 55, 30);
+  }
+
+  prev_minutes = minutes;
 }
+
+////////////////////////////////////// Update Time Over WiFi /////////////////////////////////////
 
 void update_time_over_wifi() {
   configTime(utc_offset, UTC_OFFSET_DST, NTP_SERVER);
@@ -144,8 +179,10 @@ void update_time_over_wifi() {
   seconds = atoi(sec_str);
 }
 
+////////////////////////////////// Update Time and Check Alarms /////////////////////////////////
+
 void update_time_with_check_alarm() {
-   oledControl.clearDisplay();
+  oledControl.clearDisplay();
   update_time_over_wifi();
   print_time_now();
 
@@ -159,9 +196,11 @@ void update_time_with_check_alarm() {
   }
 }
 
+////////////////////////////////////////// Ring Alarm ////////////////////////////////////////////
+
 void ring_alarm() {
-   oledControl.clearDisplay();
-   printLine("Medicine Time", 2, 0, 0);
+  oledControl.clearDisplay();
+  printLine("Medicine Time", 2, 0, 0);
 
   digitalWrite(LED_1, HIGH);
 
@@ -185,6 +224,8 @@ void ring_alarm() {
   digitalWrite(LED_1, LOW);
 }
 
+///////////////////////////////////////// Wait for Button Press ////////////////////////////////////
+
 int wait_for_button_press() {
   while (true) {
     if (digitalRead(UP) == LOW) {
@@ -203,10 +244,12 @@ int wait_for_button_press() {
   }
 }
 
+/////////////////////////////////////////// Go to Menu ////////////////////////////////////////////
+
 void go_to_menu(void) {
   while (digitalRead(CANCEL) == HIGH) {
-     oledControl.clearDisplay();
-     printLine(options[current_mode], 2, 0, 0);
+    oledControl.clearDisplay();
+    printLine(options[current_mode], 2, 0, 0);
 
     int pressed = wait_for_button_press();
 
@@ -228,13 +271,15 @@ void go_to_menu(void) {
   }
 }
 
+/////////////////////////////////////////// Set Time /////////////////////////////////////////////
+
 void set_time() {
   int temp_UTC = 0;
   int temp_hour = 0;
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
+    oledControl.clearDisplay();
+    printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -263,8 +308,8 @@ void set_time() {
   int temp_minute = 0;
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
+    oledControl.clearDisplay();
+    printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -292,17 +337,19 @@ void set_time() {
     }
   }
 
-   oledControl.clearDisplay();
-   printLine("Time is set", 0, 0, 2);
+  oledControl.clearDisplay();
+  printLine("Time is set", 0, 0, 2);
   delay(1000);
 }
+
+/////////////////////////////////////////// Set Alarm ////////////////////////////////////////////
 
 void set_alarm(int alarm) {
   int temp_hour = alarm_hours[alarm];
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
+    oledControl.clearDisplay();
+    printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -329,8 +376,8 @@ void set_alarm(int alarm) {
   int temp_minute = alarm_minutes[alarm];
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
+    oledControl.clearDisplay();
+    printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -354,10 +401,12 @@ void set_alarm(int alarm) {
     }
   }
 
-   oledControl.clearDisplay();
-   printLine("Alarm is set", 0, 0, 2);
+  oledControl.clearDisplay();
+  printLine("Alarm is set", 0, 0, 2);
   delay(1000);
 }
+
+/////////////////////////////////////////// Run Mode /////////////////////////////////////////////
 
 void run_mode(int mode) {
   if (mode == 0) {
@@ -369,6 +418,8 @@ void run_mode(int mode) {
   }
 }
 
+/////////////////////////////////// Display Text on OLED ///////////////////////////////////////
+
 void printLine(String message, int text_size, int row, int column) {
   display.setTextSize(text_size);
   display.setTextColor(SSD1306_WHITE);
@@ -376,3 +427,12 @@ void printLine(String message, int text_size, int row, int column) {
   display.println(message);
   display.display();
 }
+
+void printLineBlack(String message, int text_size, int row, int column) {
+  display.setTextSize(text_size);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(column, row);
+  display.println(message);
+  display.display();
+}
+

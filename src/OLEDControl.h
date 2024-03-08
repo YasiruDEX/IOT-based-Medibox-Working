@@ -14,6 +14,7 @@ public:
   OLEDControl(Adafruit_SSD1306 &display_obj);
   void setup();
   void printLine(String message, int textSize, int row, int column);
+  void printLineBlack(String message, int textSize, int row, int column);
   void clearDisplay();
 
 private:
