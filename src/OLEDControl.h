@@ -1,3 +1,5 @@
+#include "Arduino.h"
+
 // OLEDControl.h
 #ifndef OLED_CONTROL_H
 #define OLED_CONTROL_H
@@ -9,13 +11,13 @@ class OLEDControl {
 public:
     #define SCREEN_ADDRESS 0x3C
   
-  OLEDControl(int width, int height, int resetPin, int address);
+  OLEDControl(Adafruit_SSD1306 &display_obj);
   void setup();
   void printLine(String message, int textSize, int row, int column);
   void clearDisplay();
 
 private:
-  Adafruit_SSD1306 display;
+  Adafruit_SSD1306 &display;
 };
 
 #endif

@@ -5,11 +5,6 @@
 #include <DHTesp.h>
 #include <PubSubClient.h>
 
-#include "TemperatureControl.h"
-#include "BuzzerControl.h"
-#include "OLEDControl.h"
-#include "WiFiServer.h"
-
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
@@ -19,12 +14,20 @@
 #define UTC_OFFSET 0
 #define UTC_OFFSET_DST 0
 
+#define BUZZER 5
 #define LED_1 15
+#define LED_2 2
 #define CANCEL 34
 #define UP 33
 #define OK 32
 #define DOWN 35
 #define DHT_PIN 12
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+WiFiClient espClient;
+
+DHTesp dht_sensor;
 
 int num_notes = 8;
 int note_A = 220;
@@ -60,17 +63,17 @@ int current_mode = 0;
 int max_modes = 5;
 String options[] = {"1 - Set Time", "2 - Set Alarm 1", "3 - Set Alarm 2", "4 - Set Alarm 3", "5 - Remove Alarm"};
 int utc_offset = 19800;
-
-Adafruit_SSD1306  display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-OLEDControl oledControl(display);
-TemperatureControl temperatureControl(DHT_PIN, oledControl);
-BuzzerControl buzzerControl(BUZZER);
-WiFiServerControl wifiServerControl("Wokwi-GUEST", "");
+const float gama = 0.7;
+const float rl10 = 50;
+int angle = 0;
+int Angle_Offset = 30;
+float Controlling_Factor = 0.75;
 
 void setup() {
   Serial.begin(115200);
-  wifiServerControl.setup();
+  setupWifi();
 
+  pinMode(BUZZER, OUTPUT);
   pinMode(LED_1, OUTPUT);
   pinMode(LED_2, OUTPUT);
   pinMode(CANCEL, INPUT);
@@ -78,14 +81,21 @@ void setup() {
   pinMode(OK, INPUT);
   pinMode(DOWN, INPUT);
 
+  dht_sensor.setup(DHT_PIN, DHTesp::DHT22);
+
   Serial.begin(9600);
 
-  temperatureControl.setup();
-  buzzerControl.setup();
-  oledControl.setup();
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("ERROR"));
+    for (;;)
+      ;
+  }
 
-  oledControl.clearDisplay();
-  printLine("Welcome to medibox!", 0, 0, 2);
+  display.display();
+  delay(2000);
+
+  display.clearDisplay();
+  print_line("Welcome to medibox!", 0, 0, 2);
   delay(3000);
 
   configTime(UTC_OFFSET, UTC_OFFSET_DST, NTP_SERVER);
@@ -99,22 +109,30 @@ void loop() {
     go_to_menu();
   }
 
-  temperatureControl.checkTemperature();
+  check_temp();
+}
+
+void print_line(String message, int text_size, int row, int column) {
+  display.setTextSize(text_size);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(column, row);
+  display.println(message);
+  display.display();
 }
 
 void print_time_now() {
-  oledControl.clearDisplay();
-   printLine(String(days), 1, 0, 0);
-   printLine("/", 1, 0, 10);
-   printLine(String(month), 1, 0, 20);
-   printLine("/", 1, 0, 30);
-   printLine(String(year), 1, 0, 40);
+  display.clearDisplay();
+  print_line(String(days), 1, 0, 0);
+  print_line("/", 1, 0, 10);
+  print_line(String(month), 1, 0, 20);
+  print_line("/", 1, 0, 30);
+  print_line(String(year), 1, 0, 40);
 
-   printLine(String(hours), 2, 10, 0);
-   printLine(":", 2, 10, 20);
-   printLine(String(minutes), 2, 10, 30);
-   printLine(":", 2, 10, 50);
-   printLine(String(seconds), 2, 10, 60);
+  print_line(String(hours), 2, 10, 0);
+  print_line(":", 2, 10, 20);
+  print_line(String(minutes), 2, 10, 30);
+  print_line(":", 2, 10, 50);
+  print_line(String(seconds), 2, 10, 60);
 }
 
 void update_time_over_wifi() {
@@ -145,7 +163,7 @@ void update_time_over_wifi() {
 }
 
 void update_time_with_check_alarm() {
-   oledControl.clearDisplay();
+  display.clearDisplay();
   update_time_over_wifi();
   print_time_now();
 
@@ -160,8 +178,8 @@ void update_time_with_check_alarm() {
 }
 
 void ring_alarm() {
-   oledControl.clearDisplay();
-   printLine("Medicine Time", 2, 0, 0);
+  display.clearDisplay();
+  print_line("Medicine Time", 2, 0, 0);
 
   digitalWrite(LED_1, HIGH);
 
@@ -205,8 +223,8 @@ int wait_for_button_press() {
 
 void go_to_menu(void) {
   while (digitalRead(CANCEL) == HIGH) {
-     oledControl.clearDisplay();
-     printLine(options[current_mode], 2, 0, 0);
+    display.clearDisplay();
+    print_line(options[current_mode], 2, 0, 0);
 
     int pressed = wait_for_button_press();
 
@@ -233,8 +251,8 @@ void set_time() {
   int temp_hour = 0;
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
+    display.clearDisplay();
+    print_line("Enter hour: " + String(temp_hour), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -263,8 +281,8 @@ void set_time() {
   int temp_minute = 0;
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
+    display.clearDisplay();
+    print_line("Enter minute: " + String(temp_minute), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -292,8 +310,8 @@ void set_time() {
     }
   }
 
-   oledControl.clearDisplay();
-   printLine("Time is set", 0, 0, 2);
+  display.clearDisplay();
+  print_line("Time is set", 0, 0, 2);
   delay(1000);
 }
 
@@ -301,8 +319,8 @@ void set_alarm(int alarm) {
   int temp_hour = alarm_hours[alarm];
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
+    display.clearDisplay();
+    print_line("Enter hour: " + String(temp_hour), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -329,8 +347,8 @@ void set_alarm(int alarm) {
   int temp_minute = alarm_minutes[alarm];
 
   while (true) {
-     oledControl.clearDisplay();
-     printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
+    display.clearDisplay();
+    print_line("Enter minute: " + String(temp_minute), 0, 0, 2);
 
     int pressed = wait_for_button_press();
 
@@ -354,8 +372,8 @@ void set_alarm(int alarm) {
     }
   }
 
-   oledControl.clearDisplay();
-   printLine("Alarm is set", 0, 0, 2);
+  display.clearDisplay();
+  print_line("Alarm is set", 0, 0, 2);
   delay(1000);
 }
 
@@ -369,10 +387,46 @@ void run_mode(int mode) {
   }
 }
 
-void printLine(String message, int text_size, int row, int column) {
-  display.setTextSize(text_size);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(column, row);
-  display.println(message);
-  display.display();
+void check_temp() {
+  TempAndHumidity data = dht_sensor.getTempAndHumidity();
+  bool all_good = true;
+
+  if (data.temperature > max_temp) {
+    all_good = false;
+    digitalWrite(LED_2, HIGH);
+    print_line("Temperature High", 1, 40, 0);
+  } else if (data.temperature < min_temp) {
+    all_good = false;
+    digitalWrite(LED_2, HIGH);
+    print_line("Temperature Low", 1, 40, 0);
+  }
+
+  if (data.humidity > max_humidity) {
+    all_good = false;
+    digitalWrite(LED_2, HIGH);
+    print_line("Humidity High", 1, 50, 0);
+  } else if (data.humidity < min_humidity) {
+    all_good = false;
+    digitalWrite(LED_2, HIGH);
+    print_line("Humidity Low", 1, 50, 0);
+  }
+
+  if (all_good) {
+    digitalWrite(LED_2, LOW);
+  }
+}
+
+void setupWifi() {
+  Serial.println("Connecting to ");
+  Serial.println("Wokwi-GUEST");
+  WiFi.begin("Wokwi-GUEST", "");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("WiFi Connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
 }
