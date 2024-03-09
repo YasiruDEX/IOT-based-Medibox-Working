@@ -11,14 +11,15 @@ class OLEDControl {
 public:
     #define SCREEN_ADDRESS 0x3C
   
-  OLEDControl(Adafruit_SSD1306 &display_obj);
+  OLEDControl(int width, int height, int resetPin, int address);
   void setup();
   void printLine(String message, int textSize, int row, int column);
   void printLineBlack(String message, int textSize, int row, int column);
+  void fillRectangle(int x, int y, int width, int height);
   void clearDisplay();
 
 private:
-  Adafruit_SSD1306 &display;
+  Adafruit_SSD1306 display;
 };
 
 #endif

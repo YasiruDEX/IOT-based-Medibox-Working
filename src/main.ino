@@ -64,15 +64,17 @@ int min_temp = 26;
 int max_humidity = 80;
 int min_humidity = 60;
 int current_mode = 0;
+int prev_mode = 5;
 int max_modes = 5;
-String options[] = {"1 - Set Time", "2 - Set Alarm 1", "3 - Set Alarm 2", "4 - Set Alarm 3", "5 - Remove Alarm"};
+String options[] = {"Set Time", "Set Alarm 1", "Set Alarm 2", "Set Alarm 3", "Remove Alarm"};
 int utc_offset = 19800;
 int prev_minutes = 0;
+bool showTime = true;
+bool showMenu = true;
 
 /////////////////////////////////////// Object Instantiations ////////////////////////////////////
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-OLEDControl oledControl(display);
+OLEDControl oledControl(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_RESET, SCREEN_ADDRESS);
 TemperatureControl temperatureControl(DHT_PIN, oledControl);
 BuzzerControl buzzerControl(BUZZER);
 WiFiServerControl wifiServerControl("Wokwi-GUEST", "");
@@ -97,9 +99,15 @@ void setup() {
   oledControl.setup();
 
   oledControl.clearDisplay();
-  printLine("IoT-based-Medibox", 0, 0, 10);
-  printLine("WELCOME", 3, 20, 2);
-  delay(3000);
+  oledControl.printLine("IoT-based-Medibox", 0, 0, 10);
+  oledControl.printLine("WELCOME", 3, 20, 2);
+  oledControl.printLine(".", 3, 60, 50);
+  delay(1000);
+  oledControl.printLine(".", 3, 60, 64);
+  delay(1000);
+  oledControl.printLine(".", 3, 60, 78);
+  delay(1000);
+
 
   configTime(UTC_OFFSET, UTC_OFFSET_DST, NTP_SERVER);
 }
@@ -111,20 +119,25 @@ void loop() {
   if (digitalRead(OK) == LOW) {
     delay(1000);
     Serial.println("MENU");
+    showTime = true;
+    showMenu = true;
     go_to_menu();
   }
+  while( temperatureControl.checkTemperature()) showTime = true; 
+  Serial.println(showTime);
 
-  temperatureControl.checkTemperature();
+  options[4] =  (if(alarm_enabled) ? "Disable Alarm" : "Enable Alarm") ;
+  
 }
 
 ////////////////////////////////////// Display Time on OLED /////////////////////////////////////
 
 void print_time_now() {
-  if (prev_minutes != minutes){
+  if (prev_minutes != minutes or showTime == true){
     oledControl.clearDisplay();
 
     String date = String(days) + "/" + String(month) + "/" + String(year);
-    printLine(date, 1, 0, 30);
+    oledControl.printLine(date, 1, 0, 42);
 
     int twelve_hour = hours % 24;
 
@@ -140,11 +153,13 @@ void print_time_now() {
       time_to_print += "AM";
     }
 
-    printLine(String(time_to_print), 3, 25, 0);
+    oledControl.printLine(String(time_to_print), 3, 20, 0);
 
-    display.drawRect(44, 50, 40, 10, SSD1306_WHITE);
+    oledControl.fillRectangle(44, 52, 40, 10);
 
-    printLineBlack("MENU", 1, 55, 30);
+    oledControl.printLineBlack("MENU", 1, 54, 52);
+
+    showTime = false;
   }
 
   prev_minutes = minutes;
@@ -200,7 +215,7 @@ void update_time_with_check_alarm() {
 
 void ring_alarm() {
   oledControl.clearDisplay();
-  printLine("Medicine Time", 2, 0, 0);
+  oledControl.printLine("Medicine Time", 2, 0, 0);
 
   digitalWrite(LED_1, HIGH);
 
@@ -248,8 +263,24 @@ int wait_for_button_press() {
 
 void go_to_menu(void) {
   while (digitalRead(CANCEL) == HIGH) {
-    oledControl.clearDisplay();
-    printLine(options[current_mode], 2, 0, 0);
+    if (prev_mode != current_mode or showMenu == true){
+
+      //////////menu UI////////////
+      oledControl.clearDisplay();
+      
+      oledControl.printLine("MENU", 1, 0, 50);
+      oledControl.printLine(options[(current_mode + 4) % 5], 1, 10, 10);
+      oledControl.fillRectangle(20, 22, 128-40, 12);
+      oledControl.printLineBlack(options[(current_mode) % 5], 1, 24, 24);
+      oledControl.printLine(options[(current_mode + 1) % 5], 1, 40, 10);
+      oledControl.printLine(options[(current_mode + 2) % 5], 1, 50, 10);
+      oledControl.printLine(options[(current_mode + 3) % 5], 1, 60, 10);
+
+      /////////menu UX////////////
+      prev_mode = current_mode;
+      showMenu = false;
+
+    }
 
     int pressed = wait_for_button_press();
 
@@ -267,6 +298,7 @@ void go_to_menu(void) {
       Serial.println(current_mode);
       delay(200);
       run_mode(current_mode);
+      break;
     }
   }
 }
@@ -279,7 +311,9 @@ void set_time() {
 
   while (true) {
     oledControl.clearDisplay();
-    printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
+    oledControl.printLine("set timer", 0, 0, 45);
+    oledControl.printLine(((temp_hour >= 0 and temp_hour < 10) ? "0" : "") + String(temp_hour) + ":00", 3, 30, 22);
+    oledControl.fillRectangle(22, 55, 30, 5);
 
     int pressed = wait_for_button_press();
 
@@ -309,7 +343,12 @@ void set_time() {
 
   while (true) {
     oledControl.clearDisplay();
-    printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
+    oledControl.printLine("set timer", 0, 0, 45);
+    String minute_phrase = ((temp_hour >= 0 and temp_hour < 10) ? "0" : "") + String(temp_hour) +
+                       ":" +
+                       ((temp_minute >= 0 and temp_minute < 10) ? "0" : "") + String(temp_minute);
+    oledControl.printLine(minute_phrase, 3, 30, 22);
+    oledControl.fillRectangle(77, 55, 30, 5);
 
     int pressed = wait_for_button_press();
 
@@ -338,8 +377,10 @@ void set_time() {
   }
 
   oledControl.clearDisplay();
-  printLine("Time is set", 0, 0, 2);
+  oledControl.printLine("TIME", 2, 10, 45);
+  oledControl.printLine("SET", 2, 40, 51);
   delay(1000);
+
 }
 
 /////////////////////////////////////////// Set Alarm ////////////////////////////////////////////
@@ -349,7 +390,9 @@ void set_alarm(int alarm) {
 
   while (true) {
     oledControl.clearDisplay();
-    printLine("Enter hour: " + String(temp_hour), 0, 0, 2);
+    oledControl.printLine("set Alarm " + String(alarm), 0, 0, 41);
+    oledControl.printLine(((temp_hour >= 0 and temp_hour < 10) ? "0" : "") + String(temp_hour) + ":00", 3, 30, 22);
+    oledControl.fillRectangle(22, 55, 30, 5);
 
     int pressed = wait_for_button_press();
 
@@ -377,7 +420,12 @@ void set_alarm(int alarm) {
 
   while (true) {
     oledControl.clearDisplay();
-    printLine("Enter minute: " + String(temp_minute), 0, 0, 2);
+    oledControl.printLine("set Alarm " + String(alarm), 0, 0, 41);
+    String minute_phrase = ((temp_hour >= 0 and temp_hour < 10) ? "0" : "") + String(temp_hour) +
+                       ":" +
+                       ((temp_minute >= 0 and temp_minute < 10) ? "0" : "") + String(temp_minute);
+    oledControl.printLine(minute_phrase, 3, 30, 22);
+    oledControl.fillRectangle(77, 55, 30, 5);
 
     int pressed = wait_for_button_press();
 
@@ -402,7 +450,8 @@ void set_alarm(int alarm) {
   }
 
   oledControl.clearDisplay();
-  printLine("Alarm is set", 0, 0, 2);
+  oledControl.printLine("ALARM", 2, 10, 40);
+  oledControl.printLine("SET", 2, 40, 51);
   delay(1000);
 }
 
@@ -414,25 +463,10 @@ void run_mode(int mode) {
   } else if (mode == 1 || mode == 2 || mode == 3) {
     set_alarm(mode - 1);
   } else if (mode == 4) {
-    alarm_enabled = false;
+    alarm_enabled = !alarm_enabled;
+    oledControl.clearDisplay();
+    oledControl.printLine("ALARM", 2, 10, 40);
+    oledControl.printLine((if(alarm_enabled) ? "ENABLED" : "DISABLED"), 2, 40, 25);
+    delay(2000);
   }
 }
-
-/////////////////////////////////// Display Text on OLED ///////////////////////////////////////
-
-void printLine(String message, int text_size, int row, int column) {
-  display.setTextSize(text_size);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(column, row);
-  display.println(message);
-  display.display();
-}
-
-void printLineBlack(String message, int text_size, int row, int column) {
-  display.setTextSize(text_size);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(column, row);
-  display.println(message);
-  display.display();
-}
-

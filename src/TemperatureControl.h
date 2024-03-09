@@ -11,7 +11,7 @@ public:
   
   TemperatureControl(int dhtPin, OLEDControl &oled);
   void setup();
-  void checkTemperature();
+  bool checkTemperature();
 
 private:
   DHTesp dhtSensor;

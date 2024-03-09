@@ -15,31 +15,37 @@ void TemperatureControl::setup() {
   // Additional setup if needed
 }
 
-void TemperatureControl::checkTemperature() {
+bool TemperatureControl::checkTemperature() {
   TempAndHumidity data = dhtSensor.getTempAndHumidity();
   bool allGood = true;
 
-  if (data.temperature > maxTemp) {
+  if (data.temperature > maxTemp || data.temperature < minTemp || data.humidity > maxHumidity || data.humidity < minHumidity) {
     allGood = false;
     digitalWrite(ledPin, HIGH);
-    oledControl.printLine("Temperature High", 1, 40, 0);
-  } else if (data.temperature < minTemp) {
-    allGood = false;
-    digitalWrite(ledPin, HIGH);
-    oledControl.printLine("Temperature Low", 1, 40, 0);
-  }
+    
+    // Clear the display
+    oledControl.clearDisplay();
 
-  if (data.humidity > maxHumidity) {
-    allGood = false;
-    digitalWrite(ledPin, HIGH);
-    oledControl.printLine("Humidity High", 1, 50, 0);
-  } else if (data.humidity < minHumidity) {
-    allGood = false;
-    digitalWrite(ledPin, HIGH);
-    oledControl.printLine("Humidity Low", 1, 50, 0);
+    // Display temperature and humidity messages with better formatting
+    if (data.temperature > maxTemp) {
+      oledControl.printLine("High Temp!", 2, 10, 0);
+    } else if (data.temperature < minTemp) {
+      oledControl.printLine("Low Temp!", 2, 10, 0);
+    }
+
+    if (data.humidity > maxHumidity) {
+      oledControl.printLine("High Humidity!", 1, 20, 0);
+    } else if (data.humidity < minHumidity) {
+      oledControl.printLine("Low Humidity!", 1, 20, 0);
+    }
   }
 
   if (allGood) {
     digitalWrite(ledPin, LOW);
+  } else {
+    return true;
   }
+
+  return false;
 }
+
