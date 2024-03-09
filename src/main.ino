@@ -22,27 +22,11 @@
 #define UTC_OFFSET 0
 #define UTC_OFFSET_DST 0
 
-#define LED_1 15
 #define CANCEL 34
 #define UP 33
 #define OK 32
 #define DOWN 35
 #define DHT_PIN 12
-
-///////////////////////////////////////// Note Definitions //////////////////////////////////////
-
-int num_notes = 8;
-int note_A = 220;
-int note_B = 294;
-int note_C = 330;
-int note_D = 349;
-int note_E = 440;
-int note_F = 494;
-int note_G = 450;
-int note_C_H = 523;
-int notes[] = {note_A, note_B, note_C, note_D, note_F, note_E, note_G, note_C_H};
-
-char tempAr[6];
 
 ////////////////////////////////////// Date and Time Variables ///////////////////////////////////
 
@@ -76,7 +60,7 @@ bool showMenu = true;
 
 OLEDControl oledControl(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_RESET, SCREEN_ADDRESS);
 TemperatureControl temperatureControl(DHT_PIN, oledControl);
-BuzzerControl buzzerControl(BUZZER);
+BuzzerControl buzzerControl(BUZZER, oledControl);
 WiFiServerControl wifiServerControl("Wokwi-GUEST", "");
 
 /////////////////////////////////////////// Setup Function ////////////////////////////////////////
@@ -101,11 +85,11 @@ void setup() {
   oledControl.clearDisplay();
   oledControl.printLine("IoT-based-Medibox", 0, 0, 10);
   oledControl.printLine("WELCOME", 3, 20, 2);
-  oledControl.printLine(".", 3, 60, 50);
+  oledControl.printLine(".", 3, 38, 43);
   delay(1000);
-  oledControl.printLine(".", 3, 60, 64);
+  oledControl.printLine(".", 3, 38, 57);
   delay(1000);
-  oledControl.printLine(".", 3, 60, 78);
+  oledControl.printLine(".", 3, 38, 71);
   delay(1000);
 
 
@@ -135,6 +119,7 @@ void loop() {
 void print_time_now() {
   if (prev_minutes != minutes or showTime == true){
     oledControl.clearDisplay();
+    if(alarm_enabled) oledControl.printLine("A", 1, 0, 110);
 
     String date = String(days) + "/" + String(month) + "/" + String(year);
     oledControl.printLine(date, 1, 0, 42);
@@ -204,40 +189,13 @@ void update_time_with_check_alarm() {
   if (alarm_enabled) {
     for (int i = 0; i < num_alarms; i++) {
       if (alarm_triggered[i] == false && hours == alarm_hours[i] && minutes == alarm_minutes[i]) {
-        ring_alarm();
+        buzzerControl.ringAlarm();
         alarm_triggered[i] = true;
       }
     }
   }
 }
 
-////////////////////////////////////////// Ring Alarm ////////////////////////////////////////////
-
-void ring_alarm() {
-  oledControl.clearDisplay();
-  oledControl.printLine("Medicine Time", 2, 0, 0);
-
-  digitalWrite(LED_1, HIGH);
-
-  bool break_happened = false;
-
-  while (digitalRead(CANCEL) == HIGH) {
-    for (int i = 0; i < num_notes; i++) {
-      if (digitalRead(CANCEL) == LOW) {
-        delay(200);
-        break_happened = true;
-        break;
-      }
-      tone(BUZZER, notes[i]);
-      delay(500);
-      noTone(BUZZER);
-      delay(2);
-    }
-  }
-
-  delay(200);
-  digitalWrite(LED_1, LOW);
-}
 
 ///////////////////////////////////////// Wait for Button Press ////////////////////////////////////
 
