@@ -126,7 +126,7 @@ void loop() {
   while( temperatureControl.checkTemperature()) showTime = true; 
   Serial.println(showTime);
 
-  options[4] =  (if(alarm_enabled) ? "Disable Alarm" : "Enable Alarm") ;
+  options[4] =  ((alarm_enabled) ? "Disable Alarm" : "Enable Alarm") ;
   
 }
 
@@ -466,7 +466,7 @@ void run_mode(int mode) {
     alarm_enabled = !alarm_enabled;
     oledControl.clearDisplay();
     oledControl.printLine("ALARM", 2, 10, 40);
-    oledControl.printLine((if(alarm_enabled) ? "ENABLED" : "DISABLED"), 2, 40, 25);
+    oledControl.printLine(((alarm_enabled) ? "ENABLED" : "DISABLED"), 2, 40, 25);
     delay(2000);
   }
 }
