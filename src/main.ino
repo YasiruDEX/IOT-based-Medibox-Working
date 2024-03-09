@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <DHTesp.h>
 
+
 #include "TemperatureControl.h"
 #include "BuzzerControl.h"
 #include "OLEDControl.h"
@@ -100,16 +101,8 @@ void setup() {
 
 void loop() {
   update_time_with_check_alarm();
-  if (digitalRead(OK) == LOW) {
-    delay(1000);
-    Serial.println("MENU");
-    showTime = true;
-    showMenu = true;
-    go_to_menu();
-  }
+  menuCheck();
   while( temperatureControl.checkTemperature()) showTime = true; 
-  Serial.println(showTime);
-
   options[4] =  ((alarm_enabled) ? "Disable Alarm" : "Enable Alarm") ;
   
 }
@@ -258,6 +251,16 @@ void go_to_menu(void) {
       run_mode(current_mode);
       break;
     }
+  }
+}
+
+void menuCheck(){
+  if (digitalRead(OK) == LOW) {
+    delay(1000);
+    Serial.println("MENU");
+    showTime = true;
+    showMenu = true;
+    go_to_menu();
   }
 }
 

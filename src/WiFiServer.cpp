@@ -10,12 +10,18 @@ void WiFiServerControl::setup() {
   Serial.println("Wokwi-GUEST");
   WiFi.begin("Wokwi-GUEST", "");
 
-  while (WiFi.status() != WL_CONNECTED) {
+  unsigned long startTime = millis();  // Record the start time
+
+  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
     delay(500);
     Serial.print(".");
   }
 
-  Serial.println("WiFi Connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi Connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nFailed to connect to WiFi within 10 seconds. Continuing with normal execution.");
+  }
 }
